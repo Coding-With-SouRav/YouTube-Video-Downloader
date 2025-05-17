@@ -10,12 +10,10 @@ import socket
 import json
 from pathlib import Path
 
-
 CONFIG_FILE = Path.home() / ".yt_downloader_config.json"
 
 if sys.platform == "win32":
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("YourAppID.UniqueName")
-
 
 def is_connected():
     try:
@@ -47,19 +45,15 @@ def load_window_state():
             print("Error loading window state:", e)
 
 def resource_path(relative_path):
-    """ Get absolute path to resources for both dev and PyInstaller """
     try:
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-
     full_path = os.path.join(base_path, relative_path)
     if not os.path.exists(full_path):
         raise FileNotFoundError(f"Resource not found: {full_path}")
     return full_path
 
-
-# Placeholder text behavior
 PLACEHOLDER_TEXT = "  Paste"
 
 def add_placeholder(event=None):
@@ -71,7 +65,6 @@ def remove_placeholder(event=None):
     if url_entry.get() == PLACEHOLDER_TEXT:
         url_entry.delete(0, tk.END)
         url_entry.config(fg="black")
-
 
 window_closed_event = threading.Event()
 
@@ -96,7 +89,7 @@ def update_gui(status, speed=None, eta=None, percentage=None):
 
 def reset_gui():
     url_entry.config(state='normal')
-    download_btn.pack()
+    button_frame.pack(pady=5)
     stop_btn.pack_forget()
     progress_bar.place_forget()
     speed_label.config(text="")
@@ -126,14 +119,13 @@ def download_video():
         return
 
     if not url:
-        messagebox.showwarning("Warning", "Please enter an URL.")
+        messagebox.showwarning("Warning", "Please enter a URL.")
         return
 
     if url == PLACEHOLDER_TEXT:
-        messagebox.showwarning("Warning", "Please enter an URL.")
+        messagebox.showwarning("Warning", "Please enter a URL.")
         return
 
-    # Simple YouTube URL validation
     youtube_pattern = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+"
     if not re.match(youtube_pattern, url):
         messagebox.showerror("Invalid URL", "Please enter a valid YouTube video URL.")
@@ -141,7 +133,7 @@ def download_video():
 
     is_downloading.set(True)
     url_entry.config(state='disabled')
-    download_btn.pack_forget()
+    button_frame.pack_forget()
     stop_btn.pack(pady=5)
     progress_bar['value'] = 0
     progress_bar.place(relx=0.42, rely=0.8, anchor="center")
@@ -152,35 +144,93 @@ def download_video():
         try:
             with y.YoutubeDL({'quiet': True}) as ydl:
                 info = ydl.extract_info(url, download=False)
-                title = info.get('title', 'video')[:50]  # Limit title length
+                title = info.get('title', 'video')[:50]
                 ext = info.get('ext', 'mp4')
-                root.after(0, lambda: show_save_dialog(url, f"{title}.{ext}"))
+                root.after(0, lambda: show_save_dialog(url, f"{title}.{ext}", is_audio=False))
         except Exception as e:
             root.after(0, lambda: handle_download_error(e))
 
     threading.Thread(target=fetch_info, daemon=True).start()
 
+def download_audio():
+    url = url_entry.get().strip()
 
-def show_save_dialog(url, default_name):
+    if not is_connected():
+        messagebox.showerror("Network Error", "No internet connection. Please check your connection.")
+        return
+
+    if not url:
+        messagebox.showwarning("Warning", "Please enter a URL.")
+        return
+
+    if url == PLACEHOLDER_TEXT:
+        messagebox.showwarning("Warning", "Please enter a URL.")
+        return
+
+    youtube_pattern = r"(https?://)?(www\.)?(youtube\.com|youtu\.be)/.+"
+    if not re.match(youtube_pattern, url):
+        messagebox.showerror("Invalid URL", "Please enter a valid YouTube video URL.")
+        return
+
+    is_downloading.set(True)
+    url_entry.config(state='disabled')
+    button_frame.pack_forget()
+    stop_btn.pack(pady=5)
+    progress_bar['value'] = 0
+    progress_bar.place(relx=0.42, rely=0.8, anchor="center")
+    percentage_label.config(text="")
+    update_gui("Fetching audio info...")
+
+    def fetch_audio_info():
+        try:
+            with y.YoutubeDL({'quiet': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                title = info.get('title', 'audio')[:50]
+                root.after(0, lambda: show_save_dialog(url, f"{title}.mp3", is_audio=True))
+        except Exception as e:
+            root.after(0, lambda: handle_download_error(e))
+
+    threading.Thread(target=fetch_audio_info, daemon=True).start()
+
+def show_save_dialog(url, default_name, is_audio=False):
+    if is_audio:
+        defaultextension = ".mp3"
+        filetypes = [("MP3 files", "*.mp3"), ("All files", "*.*")]
+    else:
+        defaultextension = ".mp4"
+        filetypes = [("MP4 files", "*.mp4"), ("All files", "*.*")]
+
     save_path = filedialog.asksaveasfilename(
-        defaultextension=".mp4",
+        defaultextension=defaultextension,
         initialfile=default_name,
-        filetypes=[("MP4 files", "*.mp4"), ("All files", "*.*")]
+        filetypes=filetypes
     )
     if not save_path:
         reset_gui()
         return
-    start_download(url, save_path)
+    start_download(url, save_path, is_audio)
 
-def start_download(url, save_path):
+def start_download(url, save_path, is_audio=False):
     def run_download():
         try:
-            ydl_opts = {
-                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
-                'merge_output_format': 'mp4',
-                'outtmpl': save_path,
-                'progress_hooks': [progress_hook],
-            }
+            if is_audio:
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '192',
+                    }],
+                    'outtmpl': save_path.replace('.mp3', '') + '.%(ext)s',  
+                    'progress_hooks': [progress_hook],
+                }
+            else:
+                ydl_opts = {
+                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+                    'merge_output_format': 'mp4',
+                    'outtmpl': save_path,
+                    'progress_hooks': [progress_hook],
+                }
 
             with y.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
@@ -190,7 +240,6 @@ def start_download(url, save_path):
                 messagebox.showinfo("Success", "Download completed successfully!")
         except Exception as e:
             if not window_closed_event.is_set():
-                # FIX: Make sure `e` is in scope for the lambda
                 root.after(0, lambda error=e: handle_download_error(error))
         finally:
             window_closed_event.clear()
@@ -228,7 +277,6 @@ def cancel_download():
     if messagebox.askokcancel("Cancel", "Do you want to cancel downloading?"):
         window_closed_event.set()
 
-
 # GUI Setup
 root = tk.Tk()
 root.title("YouTube Video Downloader")
@@ -240,8 +288,7 @@ try:
     root.iconbitmap(resource_path(r"icons/icon.ico"))
 except Exception as e:
     print("Icon load error:", e) 
-    
-# Create Tkinter variables
+
 is_downloading = tk.BooleanVar(value=False)
 
 style = ttk.Style()
@@ -258,7 +305,7 @@ progress_bar = ttk.Progressbar(root,
 progress_bar.place(relx=0.42, rely=0.8, anchor="center")
 progress_bar.place_forget()
 
-# URL Entry with enhanced validation
+
 tk.Label(root, text="Enter YouTube URL:", font=("Arial", 12)).pack(pady=10)
 url_entry = tk.Entry(root, width=50, font=("Arial", 11, 'italic'), bg='#e0e0e0')
 url_entry.pack(pady=5)
@@ -276,16 +323,21 @@ def unfocus_on_click(event):
 
 root.bind("<Button-1>", unfocus_on_click)
 
-# Modified Enter key binding
 def on_enter(event):
     if not is_downloading.get():
         download_video()
-url_entry.bind('<Return>', on_enter)
 
-# Buttons
-download_btn = tk.Button(root, text="Download Video", font=("Arial", 11, "bold"),
+
+button_frame = tk.Frame(root)
+button_frame.pack(pady=5)
+
+download_btn = tk.Button(button_frame, text="Download Video", font=("Arial", 11, "bold"),
                          command=download_video, bg="#28a745", fg="white")
-download_btn.pack(pady=5)
+download_btn.pack(side=tk.LEFT, padx=5)
+
+download_audio_btn = tk.Button(button_frame, text="Download Audio", font=("Arial", 11, "bold"),
+                         command=download_audio, bg="#28a745", fg="white")
+download_audio_btn.pack(side=tk.LEFT, padx=5)
 
 stop_btn = tk.Button(root, text="Cancel Download", font=("Arial", 11, "bold"),
                     command=cancel_download, bg="red", fg="white")
