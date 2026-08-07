@@ -88,6 +88,3 @@ This Python-based GUI application allows users to download YouTube videos by pro
 
 This application provides a streamlined experience for downloading YouTube content while maintaining essential user feedback and error resilience.
 
-
-<!-- AUTO UPDATE -->
-Last maintenance: 2026-08-07 13:12 UTC
