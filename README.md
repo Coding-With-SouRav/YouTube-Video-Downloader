@@ -2,8 +2,9 @@
 
 ---
 ## Demo Images
-<img width="943" height="837" alt="Screenshot 2026-02-23 140645" src="https://github.com/user-attachments/assets/5beeb9c1-1ca0-43b4-92af-fb96bcf1d633" />
-<img width="936" height="835" alt="Screenshot 2026-02-23 140718" src="https://github.com/user-attachments/assets/031c7f27-48ac-490c-97bf-171ffe9cc531" />
+<img width="750" height="668" alt="image" src="https://github.com/user-attachments/assets/ebd39e49-a2e8-4480-bd28-a5181902f842" />
+
+<img width="753" height="679" alt="image" src="https://github.com/user-attachments/assets/09ba6dc9-788d-42f1-9cc1-69ee4ca24149" />
 
 **Overview**  
 This Python-based GUI application allows users to download YouTube videos by providing a URL. It features a user-friendly interface, real-time download progress tracking, and basic error handling. The application is built with `tkinter` for the GUI and `yt-dlp` for backend video downloading.
